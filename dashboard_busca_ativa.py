@@ -559,7 +559,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio:
     tab_base, tab_colaboradores = st.tabs(["📊 Análise da Base", "👥 Desempenho por Colaborador"])
 
     with tab_base:
-        st.markdown("### KPIs da Base de Dados")
+        st.markdown("### Resultados resumido")
         col1_base, col2_base_container, col3_base, col4_base, col5_base = st.columns([1, 1, 1, 1, 1])
         
         with col1_base: st.metric("📋 Total de Serviços", formatar_inteiro(kpis['total']))
