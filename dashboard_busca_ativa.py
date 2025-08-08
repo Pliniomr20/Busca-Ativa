@@ -517,56 +517,6 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# CSS para o novo cartão de KPI (adicionado para esta correção)
-st.markdown(f"""
-    <style>
-    .kpi-container {{
-        background-color: var(--white-color);
-        border-radius: 12px;
-        padding: 20px 25px;
-        box-shadow: 0 4px 10px var(--shadow-light-color);
-        text-align: center;
-        border: 1px solid var(--grey-light-color);
-        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        margin-bottom: 15px;
-        min-height: 100px; /* Garante altura mínima para alinhamento */
-    }}
-    .kpi-container:hover {{
-        transform: translateY(-3px);
-        box-shadow: 0 6px 15px var(--shadow-light-color);
-    }}
-    .kpi-main-label {{
-        color: var(--grey-dark-color);
-        font-size: 1.1em;
-        font-weight: 500;
-        margin-bottom: 5px;
-    }}
-    .kpi-main-value {{
-        color: var(--primary-color);
-        font-size: 2.2em;
-        font-weight: bold;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        white-space: normal;
-    }}
-    .kpi-sub-value {{
-        font-size: 0.9em;
-        color: var(--text-default-color);
-        margin-top: 10px;
-        line-height: 1.5;
-    }}
-    .kpi-sub-value span {{
-        font-weight: bold;
-    }}
-    .kpi-sub-value .produtivo {{
-        color: var(--success-color);
-    }}
-    .kpi-sub-value .improdutivo {{
-        color: var(--danger-color);
-    }}
-    </style>
-""", unsafe_allow_html=True)
-
 
 # --- UI Principal ---
 st.set_page_config(page_title="Painel de Performance Busca Ativa", layout="wide", initial_sidebar_state="collapsed")
@@ -648,7 +598,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio:
         st.markdown("### Análise de Serviços")
         
         col_grafico_executados, col_grafico_atribuir = st.columns(2)
-        
         with col_grafico_executados:
             st.markdown("#### Serviços Executados")
             
@@ -731,8 +680,8 @@ if not df_principal.empty and selecao_regional and selecao_municipio:
             st.markdown("---")
             
         if not df_colab_performance.empty:
-            # --- NOVO FILTRO DE PESQUISA ---
-            col_search, col_spacer = st.columns([2, 8])
+            # Adiciona o filtro de pesquisa
+            col_search, _ = st.columns([2, 8])
             with col_search:
                 search_term = st.text_input("Pesquisar por nome:", "").upper()
             
@@ -740,9 +689,9 @@ if not df_principal.empty and selecao_regional and selecao_municipio:
             if search_term:
                 df_filtrado_colab = df_filtrado_colab[df_filtrado_colab[config.coluna_colaborador].str.contains(search_term, na=False)]
 
-            # --- NOVA ORDENAÇÃO POR QTD EXECUTADOS ---
+            # Ordena a tabela pela quantidade de serviços executados
             df_filtrado_colab = df_filtrado_colab.sort_values(by='Qtd_Executados', ascending=False)
-
+            
             st.markdown("#### Tabela de Desempenho Individual Completa")
             st.dataframe(df_filtrado_colab.assign(**{
                 'Qtd_Executados': df_filtrado_colab['Qtd_Executados'].apply(formatar_inteiro),
@@ -761,7 +710,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio:
                 'Qtd_Produtivos': {'label': 'Quantidade de Serviços Produtivos', 'color': config.palette['SUCCESS']},
                 'Qtd_Improdutivos': {'label': 'Quantidade de Serviços Improdutivos', 'color': config.palette['DANGER']},
                 'Qtd_Em_Campo': {'label': 'Quantidade de Serviços em Campo', 'color': config.palette['PRIMARY']},
-                'Qtd_Pendentes': {'label': 'Quantidade de Serviços Pendentes', 'color': config.palette['WARNING']},
+                'Qtd_Pendentes': {'label': 'Quantidade de Serviços Pendentes', 'color': config.palette['ACCENT']},
             }
             
             selecao_metrica = st.selectbox(
