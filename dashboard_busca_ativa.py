@@ -122,10 +122,6 @@ def carregar_e_processar_dados(caminho_arquivo: Path) -> pd.DataFrame:
             st.error(f"Colunas essenciais faltando na planilha: {missing_cols}")
             st.stop()
             
-        # --- ALTERAÇÃO SOLICITADA: REMOÇÃO DO FILTRO DE ALVO_CONDICAO_OBJETIVA ---
-        # A linha abaixo foi removida para incluir tanto 'SIM' quanto 'NÃO'
-        # df = df[df['ALVO_CONDICAO_OBJETIVA'].str.upper().str.strip() == 'SIM'].copy()
-        
         if df.empty:
             st.warning("Nenhum dado foi encontrado após a aplicação dos filtros iniciais. Verifique a planilha.")
             st.stop()
@@ -158,8 +154,12 @@ def calcular_indicadores_totais(df_base_total: pd.DataFrame, df_para_analise: pd
             "total": 0, "executados_totais": 0, "executados_produtivos": 0, "executados_improdutivos": 0,
             "em_campo": 0, "a_atribuir": 0, "pendentes": 0, "colaboradores_nao_encontrados": []
         }
-    qtd_total_servicos_base = len(df_base_total)
-    qtd_a_atribuir_base = df_base_total['NOME_FASE'].isin(config.servicos['a_atribuir']).sum()
+        
+    # --- AQUI ESTÁ A CORREÇÃO: Cria um novo DataFrame filtrado apenas para os KPIs solicitados ---
+    df_filtrado_sim = df_base_total[df_base_total['ALVO_CONDICAO_OBJETIVA'].str.upper().str.strip() == 'SIM'].copy()
+
+    qtd_total_servicos_base = len(df_filtrado_sim)
+    qtd_a_atribuir_base = df_filtrado_sim['NOME_FASE'].isin(config.servicos['a_atribuir']).sum()
 
     if df_para_analise.empty:
         qtd_executados_totais = 0
@@ -168,6 +168,7 @@ def calcular_indicadores_totais(df_base_total: pd.DataFrame, df_para_analise: pd
         qtd_em_campo_colab = 0
         qtd_pendentes_colab = 0
     else:
+        # Os demais cálculos continuam usando df_para_analise (que respeita os filtros do Streamlit)
         qtd_executados_totais = df_para_analise['NOME_FASE'].isin(config.servicos['executados']).sum()
         qtd_executados_produtivos = df_para_analise['NOME_FASE'].isin(config.servicos['produtivos']).sum()
         qtd_executados_improdutivos = df_para_analise['NOME_FASE'].isin(config.servicos['improdutivos']).sum()
@@ -692,7 +693,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
     kpis = calcular_indicadores_totais(df_base_total, df_para_analise, config.colaboradores_list)
     df_colab_performance = agregar_desempenho_colaborador(df_para_analise, config.colaboradores_list)
     
-    # AQUI ESTÁ A ALTERAÇÃO: Passando df_principal para calcular as metas, ignorando o filtro de data.
+    # AQUI ESTÁ A CORREÇÃO: A função de metas recebe o df_principal original
     metas_kpis = calcular_metas_por_regional(df_principal, config.metas_regionais, selecao_regional)
 
     tab_base, tab_colaboradores = st.tabs(["📊 Análise da Base", "👥 Desempenho por Colaborador"])
@@ -734,7 +735,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
         
         with col1_base: st.metric("📋 Total de Serviços", formatar_inteiro(kpis['total']))
         with col2_base: 
-            # --- CORREÇÃO: KPI Executados com detalhe de produtivos e improdutivos ---
+            # --- KPI Executados com detalhe de produtivos e improdutivos ---
             st.markdown(f"""
                 <div data-testid="stMetric">
                     <div data-testid="stMetricLabel" style="display: flex; align-items: center; justify-content: flex-start; gap: 5px;">
@@ -876,8 +877,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
             st.markdown("---")
             
         if not df_colab_performance.empty:
-            # --- CÓDIGO REMOVIDO: KPI de executados dos colaboradores com detalhe de produtivos e improdutivos ---
-            
             # Adiciona o filtro de pesquisa
             col_search, _ = st.columns([2, 8])
             with col_search:
