@@ -122,7 +122,9 @@ def carregar_e_processar_dados(caminho_arquivo: Path) -> pd.DataFrame:
             st.error(f"Colunas essenciais faltando na planilha: {missing_cols}")
             st.stop()
             
-        df = df[df['ALVO_CONDICAO_OBJETIVA'].str.upper().str.strip() == 'SIM'].copy()
+        # --- ALTERAÇÃO SOLICITADA: REMOÇÃO DO FILTRO DE ALVO_CONDICAO_OBJETIVA ---
+        # A linha abaixo foi removida para incluir tanto 'SIM' quanto 'NÃO'
+        # df = df[df['ALVO_CONDICAO_OBJETIVA'].str.upper().str.strip() == 'SIM'].copy()
         
         if df.empty:
             st.warning("Nenhum dado foi encontrado após a aplicação dos filtros iniciais. Verifique a planilha.")
