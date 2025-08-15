@@ -55,7 +55,7 @@ class Config:
             'a_atribuir': ['ALVO NAO ATRIBUIDO'],
             'pendentes': ['ALVO ENVIADO - NAO RECEBIDO'],
             'produtivos': ['CONCLUIDO OK'],
-            'improdutivos': ['DESCARREGADO COM IMPEDIMENTO', 'IMPROCEDENTE']
+            'improdutivos': ['DESCARREGADO COM IMPEDIMENTO', 'IMPROCEDENTE', 'DESCARREGADO SEM IMPEDIMENTO']
         }
 
         self.colaboradores_list = [
