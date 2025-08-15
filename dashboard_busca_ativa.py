@@ -54,7 +54,7 @@ class Config:
             'em_campo': ['ALVO EM CAMPO'],
             'a_atribuir': ['ALVO NAO ATRIBUIDO'],
             'pendentes': ['ALVO ENVIADO - NAO RECEBIDO'],
-            'produtivos': ['CONCLUIDO OK', 'DESCARREGADO SEM IMPEDIMENTO'],
+            'produtivos': ['CONCLUIDO OK'],
             'improdutivos': ['DESCARREGADO COM IMPEDIMENTO', 'IMPROCEDENTE']
         }
 
@@ -152,28 +152,30 @@ def calcular_indicadores_totais(df_base_total: pd.DataFrame, df_para_analise: pd
     if df_base_total.empty:
         return {
             "total": 0, "executados_totais": 0, "executados_produtivos": 0, "executados_improdutivos": 0,
-            "em_campo": 0, "a_atribuir": 0, "pendentes": 0, "colaboradores_nao_encontrados": []
+            "em_campo": 0, "a_atribuir": 0, "pendentes": 0, "colaboradores_nao_encontrados": [],
+            "executados_mf_produtivos": 0
         }
         
-    # --- AQUI ESTÁ A CORREÇÃO: Cria um novo DataFrame filtrado apenas para os KPIs solicitados ---
     df_filtrado_sim = df_base_total[df_base_total['ALVO_CONDICAO_OBJETIVA'].str.upper().str.strip() == 'SIM'].copy()
 
     qtd_total_servicos_base = len(df_filtrado_sim)
     qtd_a_atribuir_base = df_filtrado_sim['NOME_FASE'].isin(config.servicos['a_atribuir']).sum()
 
-    if df_para_analise.empty:
+    if df_base_total.empty:
         qtd_executados_totais = 0
         qtd_executados_produtivos = 0
         qtd_executados_improdutivos = 0
-        qtd_em_campo_colab = 0
-        qtd_pendentes_colab = 0
+        qtd_em_campo = 0
+        qtd_pendentes = 0
     else:
-        # Os demais cálculos continuam usando df_para_analise (que respeita os filtros do Streamlit)
-        qtd_executados_totais = df_para_analise['NOME_FASE'].isin(config.servicos['executados']).sum()
-        qtd_executados_produtivos = df_para_analise['NOME_FASE'].isin(config.servicos['produtivos']).sum()
-        qtd_executados_improdutivos = df_para_analise['NOME_FASE'].isin(config.servicos['improdutivos']).sum()
-        qtd_em_campo_colab = df_para_analise['NOME_FASE'].isin(config.servicos['em_campo']).sum()
-        qtd_pendentes_colab = df_para_analise['NOME_FASE'].isin(config.servicos['pendentes']).sum()
+        qtd_executados_totais = df_base_total['NOME_FASE'].isin(config.servicos['executados']).sum()
+        qtd_executados_produtivos = df_base_total['NOME_FASE'].isin(config.servicos['produtivos']).sum()
+        qtd_executados_improdutivos = df_base_total['NOME_FASE'].isin(config.servicos['improdutivos']).sum()
+        qtd_em_campo = df_base_total['NOME_FASE'].isin(config.servicos['em_campo']).sum()
+        qtd_pendentes = df_base_total['NOME_FASE'].isin(config.servicos['pendentes']).sum()
+
+    # --- Adicionado: KPI de produtivos apenas para os colaboradores do usuário ---
+    qtd_executados_mf_produtivos = df_para_analise['NOME_FASE'].isin(config.servicos['produtivos']).sum()
 
     colaboradores_na_base = set(df_base_total[config.coluna_colaborador].unique())
     colaboradores_nao_encontrados = [c for c in colaboradores_list if c.upper().strip() not in colaboradores_na_base]
@@ -183,10 +185,11 @@ def calcular_indicadores_totais(df_base_total: pd.DataFrame, df_para_analise: pd
         "executados_totais": qtd_executados_totais,
         "executados_produtivos": qtd_executados_produtivos,
         "executados_improdutivos": qtd_executados_improdutivos,
-        "em_campo": qtd_em_campo_colab,
+        "em_campo": qtd_em_campo,
         "a_atribuir": qtd_a_atribuir_base,
-        "pendentes": qtd_pendentes_colab,
-        "colaboradores_nao_encontrados": colaboradores_nao_encontrados
+        "pendentes": qtd_pendentes,
+        "colaboradores_nao_encontrados": colaboradores_nao_encontrados,
+        "executados_mf_produtivos": qtd_executados_mf_produtivos
     }
 
 def calcular_metas_por_regional(df_base_total: pd.DataFrame, metas_regionais: dict, selecao_regional: list) -> list:
@@ -211,9 +214,15 @@ def agregar_por_dimensao(df: pd.DataFrame, coluna_agregacao: str, servico_type: 
         return pd.DataFrame(columns=['Dimensão', 'Métrica'])
     
     if servico_type in config.servicos:
-        df_agregado = df.groupby(coluna_agregacao)['NOME_FASE'].apply(
-            lambda x: x.isin(config.servicos[servico_type]).sum()
-        ).reset_index()
+        if servico_type == 'a_atribuir':
+            df_agregado = df[df['ALVO_CONDICAO_OBJETIVA'].str.upper().str.strip() == 'SIM'].copy()
+            df_agregado = df_agregado.groupby(coluna_agregacao)['NOME_FASE'].apply(
+                lambda x: x.isin(config.servicos[servico_type]).sum()
+            ).reset_index()
+        else:
+            df_agregado = df.groupby(coluna_agregacao)['NOME_FASE'].apply(
+                lambda x: x.isin(config.servicos[servico_type]).sum()
+            ).reset_index()
     else:
         df_agregado = df.groupby(coluna_agregacao)['NOME_FASE'].count().reset_index()
         
@@ -237,7 +246,6 @@ def agregar_desempenho_colaborador(df: pd.DataFrame, colaboradores_list: list) -
     return df_agregado.sort_values(by=config.coluna_colaborador)
 
 def plot_bar_chart(df_data, x_col, y_col, title, x_label, y_label, color_discrete_sequence=None, orientation='h'):
-    # Verificação para dados vazios
     if df_data.empty:
         fig = px.bar(title=f"<b>{title}</b>")
         fig.update_layout(
@@ -249,15 +257,13 @@ def plot_bar_chart(df_data, x_col, y_col, title, x_label, y_label, color_discret
         )
         return fig
     
-    # Define a orientação do gráfico
     if orientation == 'h':
         x_plot = y_col
         y_plot = x_col
-    else: # 'v' para vertical
+    else:
         x_plot = x_col
         y_plot = y_col
 
-    # Criando o gráfico de barras
     fig = px.bar(
         df_data,
         x=x_plot,  
@@ -381,18 +387,19 @@ class RelatorioVisualPDF:
             ]
         ]
         
+        # --- Alterado: Adicionado o novo KPI para os colaboradores do usuário no PDF ---
         kpi_data_row2 = [
             [
                 Paragraph("Serviços em Campo:", self.styles['kpi_card_label']),
                 Paragraph("Serviços a Atribuir:", self.styles['kpi_card_label']),
                 Paragraph("Serviços Pendentes:", self.styles['kpi_card_label']),
-                Paragraph("", self.styles['kpi_card_label'])
+                Paragraph("Produtivos (MF):", self.styles['kpi_card_label'])
             ],
             [
                 Paragraph(formatar_inteiro(kpis['em_campo']), self.styles['kpi_card_value']),
                 Paragraph(formatar_inteiro(kpis['a_atribuir']), self.styles['kpi_card_value']),
                 Paragraph(formatar_inteiro(kpis['pendentes']), self.styles['kpi_card_value']),
-                Paragraph("", self.styles['kpi_card_value'])
+                Paragraph(formatar_inteiro(kpis['executados_mf_produtivos']), self.styles['kpi_card_value'])
             ]
         ]
         
@@ -458,11 +465,11 @@ class RelatorioVisualPDF:
         self.story.append(Spacer(1, 0.1 * inch))
 
     def generate_report(self, df_base_total: pd.DataFrame, df_para_analise: pd.DataFrame, df_colab_performance: pd.DataFrame, colaboradores_nao_encontrados: list, selecao_regional: list):
-        kpis = calcular_indicadores_totais(df_base_total, df_para_analise, config.colaboradores_list)
+        kpis_gerais = calcular_indicadores_totais(df_base_total, df_para_analise, config.colaboradores_list)
         metas_kpis = calcular_metas_por_regional(df_principal, config.metas_regionais, selecao_regional)
         
         self.story.append(Paragraph("Resumo de Performance Geral", self.styles['h1']))
-        self.add_kpi_summary(kpis)
+        self.add_kpi_summary(kpis_gerais)
 
         if metas_kpis:
             self.story.append(Spacer(1, 0.25 * inch))
@@ -492,9 +499,9 @@ class RelatorioVisualPDF:
         
         self.story.append(Paragraph("Análise por Regional e Município", self.styles['h1']))
         
-        df_prod_reg = agregar_por_dimensao(df_para_analise, 'REGIONAL', 'produtivos').rename(columns={'Métrica': 'Produtivos'})
-        df_improd_reg = agregar_por_dimensao(df_para_analise, 'REGIONAL', 'improdutivos').rename(columns={'Métrica': 'Improdutivos'})
-        df_total_reg = agregar_por_dimensao(df_para_analise, 'REGIONAL', 'executados').rename(columns={'Métrica': 'Total'})
+        df_prod_reg = agregar_por_dimensao(df_base_total, 'REGIONAL', 'produtivos').rename(columns={'Métrica': 'Produtivos'})
+        df_improd_reg = agregar_por_dimensao(df_base_total, 'REGIONAL', 'improdutivos').rename(columns={'Métrica': 'Improdutivos'})
+        df_total_reg = agregar_por_dimensao(df_base_total, 'REGIONAL', 'executados').rename(columns={'Métrica': 'Total'})
 
         df_analise_regional = df_prod_reg.merge(df_improd_reg, on='Dimensão', how='outer').merge(df_total_reg, on='Dimensão', how='outer').fillna(0)
         df_analise_regional = df_analise_regional.sort_values(by='Total', ascending=False)
@@ -693,7 +700,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
     kpis = calcular_indicadores_totais(df_base_total, df_para_analise, config.colaboradores_list)
     df_colab_performance = agregar_desempenho_colaborador(df_para_analise, config.colaboradores_list)
     
-    # AQUI ESTÁ A CORREÇÃO: A função de metas recebe o df_principal original
     metas_kpis = calcular_metas_por_regional(df_principal, config.metas_regionais, selecao_regional)
 
     tab_base, tab_colaboradores = st.tabs(["📊 Análise da Base", "👥 Desempenho por Colaborador"])
@@ -735,7 +741,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
         
         with col1_base: st.metric("📋 Total de Serviços", formatar_inteiro(kpis['total']))
         with col2_base: 
-            # --- KPI Executados com detalhe de produtivos e improdutivos ---
             st.markdown(f"""
                 <div data-testid="stMetric">
                     <div data-testid="stMetricLabel" style="display: flex; align-items: center; justify-content: flex-start; gap: 5px;">
@@ -763,45 +768,42 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
         with col5_base: st.metric("📤 Pendentes", formatar_inteiro(kpis['pendentes']))
         
         if kpis['pendentes'] > 0:
-            st.warning(f"⚠️ **Atenção!** Existem **{formatar_inteiro(kpis['pendentes'])}** serviços pendentes na base de dados para seus colaboradores.")
+            st.warning(f"⚠️ **Atenção!** Existem **{formatar_inteiro(kpis['pendentes'])}** serviços pendentes na base de dados.")
 
         st.markdown("---")
         st.markdown("### Análise de Serviços")
         
-        # O novo layout será uma única coluna para os gráficos
-        
         st.markdown("#### Serviços Executados")
         
-        selecao_visualizacao_executados = st.radio(
+        selecao_visualizacao_executados_base = st.radio(
             "Visualização do Gráfico:",
             ["Produtivos e Improdutivos", "Total de Executados"],
-            key="radio_visao_executados",
+            key="radio_visao_executados_base",
             horizontal=True
         )
 
-        visao_dimensao_executados = st.radio(
+        visao_dimensao_executados_base = st.radio(
             "Agrupar por:", 
             ["Regional", "Município"], 
-            key="radio_dimensao_executados", 
+            key="radio_dimensao_executados_base", 
             horizontal=True
         )
         
-        coluna_agregacao = 'REGIONAL' if visao_dimensao_executados == "Regional" else 'MUNICIPIO'
+        coluna_agregacao_base = 'REGIONAL' if visao_dimensao_executados_base == "Regional" else 'MUNICIPIO'
         
-        if selecao_visualizacao_executados == "Total de Executados":
-            df_agregado = agregar_por_dimensao(df_para_analise, coluna_agregacao, 'executados')
+        if selecao_visualizacao_executados_base == "Total de Executados":
+            df_agregado = agregar_por_dimensao(df_base_total, coluna_agregacao_base, 'executados')
             if not df_agregado.empty:
-                st.plotly_chart(plot_bar_chart(df_agregado, 'Dimensão', 'Métrica', 'Total de Serviços Executados por ' + visao_dimensao_executados, visao_dimensao_executados, 'Quantidade', color_discrete_sequence=['#1f77b4']), use_container_width=True)
+                st.plotly_chart(plot_bar_chart(df_agregado, 'Dimensão', 'Métrica', 'Total de Serviços Executados por ' + visao_dimensao_executados_base, visao_dimensao_executados_base, 'Quantidade', color_discrete_sequence=['#1f77b4']), use_container_width=True)
             else:
                 st.info("Nenhum dado de 'Total de Executados' disponível para a seleção.")
-        else: # "Produtivos e Improdutivos"
-            df_produtivos = agregar_por_dimensao(df_para_analise, coluna_agregacao, 'produtivos')
-            df_improdutivos = agregar_por_dimensao(df_para_analise, coluna_agregacao, 'improdutivos')
+        else:
+            df_produtivos = agregar_por_dimensao(df_base_total, coluna_agregacao_base, 'produtivos')
+            df_improdutivos = agregar_por_dimensao(df_base_total, coluna_agregacao_base, 'improdutivos')
             
             if not df_produtivos.empty or not df_improdutivos.empty:
                 df_plot_prod_improd = pd.concat([df_produtivos.assign(Tipo='Produtivo'), df_improdutivos.assign(Tipo='Improdutivo')])
                 
-                # Definindo a paleta de tons de azul para Produtivos/Improdutivos
                 color_map = {'Produtivo': '#003366', 'Improdutivo': '#6699cc'} 
                 
                 fig = px.bar(
@@ -809,8 +811,8 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                     x='Métrica', 
                     y='Dimensão', 
                     color='Tipo',
-                    title=f"<b>Serviços Produtivos e Improdutivos por {visao_dimensao_executados}</b>",
-                    labels={'Dimensão': visao_dimensao_executados, 'Métrica': 'Quantidade'},
+                    title=f"<b>Serviços Produtivos e Improdutivos por {visao_dimensao_executados_base}</b>",
+                    labels={'Dimensão': visao_dimensao_executados_base, 'Métrica': 'Quantidade'},
                     color_discrete_map=color_map,
                     orientation='h',
                     height=min(600, len(df_plot_prod_improd['Dimensão'].unique()) * 30 + 150)
@@ -845,29 +847,28 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
         st.markdown("---")
         
         st.markdown("#### Serviços a Atribuir")
-        visao_atribuir = st.radio("Filtrar a Atribuir por:", ["Regional", "Município"], key="radio_atribuir", horizontal=True)
-        coluna_atribuir = 'REGIONAL' if visao_atribuir == "Regional" else 'MUNICIPIO'
+        visao_atribuir_base = st.radio("Filtrar a Atribuir por:", ["Regional", "Município"], key="radio_atribuir_base", horizontal=True)
+        coluna_atribuir_base = 'REGIONAL' if visao_atribuir_base == "Regional" else 'MUNICIPIO'
         
-        df_agregado_atribuir = agregar_por_dimensao(df_base_total, coluna_atribuir, 'a_atribuir')
+        df_agregado_atribuir = agregar_por_dimensao(df_base_total, coluna_atribuir_base, 'a_atribuir')
         if not df_agregado_atribuir.empty:
-            st.plotly_chart(plot_bar_chart(df_agregado_atribuir, 'Dimensão', 'Métrica', 'Serviços a Atribuir por ' + visao_atribuir, visao_atribuir, 'Quantidade', color_discrete_sequence=['#42a5f5']), use_container_width=True)
+            st.plotly_chart(plot_bar_chart(df_agregado_atribuir, 'Dimensão', 'Métrica', 'Serviços a Atribuir por ' + visao_atribuir_base, visao_atribuir_base, 'Quantidade', color_discrete_sequence=['#42a5f5']), use_container_width=True)
         else:
             st.info("Nenhum dado de 'Serviços a Atribuir' disponível para a seleção.")
         
         st.markdown("---")
         
         st.markdown("#### Serviços Pendentes")
-        visao_pendentes = st.radio("Filtrar Pendentes por:", ["Regional", "Município"], key="radio_pendentes", horizontal=True)
-        coluna_pendentes = 'REGIONAL' if visao_pendentes == "Regional" else 'MUNICIPIO'
+        visao_pendentes_base = st.radio("Filtrar Pendentes por:", ["Regional", "Município"], key="radio_pendentes_base", horizontal=True)
+        coluna_pendentes_base = 'REGIONAL' if visao_pendentes_base == "Regional" else 'MUNICIPIO'
         
-        df_agregado_pendentes = agregar_por_dimensao(df_para_analise, coluna_pendentes, 'pendentes')
+        df_agregado_pendentes = agregar_por_dimensao(df_base_total, coluna_pendentes_base, 'pendentes')
         if not df_agregado_pendentes.empty:
-            st.plotly_chart(plot_bar_chart(df_agregado_pendentes, 'Dimensão', 'Métrica', 'Serviços Pendentes por ' + visao_pendentes, visao_pendentes, 'Quantidade', color_discrete_sequence=['#1565c0']), use_container_width=True)
+            st.plotly_chart(plot_bar_chart(df_agregado_pendentes, 'Dimensão', 'Métrica', 'Serviços Pendentes por ' + visao_pendentes_base, visao_pendentes_base, 'Quantidade', color_discrete_sequence=['#1565c0']), use_container_width=True)
         else:
             st.info("Nenhum dado de 'Serviços Pendentes' disponível para a seleção.")
 
     with tab_colaboradores:
-        # --- ATUALIZADO: Título da seção de colaboradores ---
         st.markdown("### RESULTADOS COLABORADORES MF")
         
         colaboradores_nao_encontrados = kpis['colaboradores_nao_encontrados']
@@ -877,7 +878,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
             st.markdown("---")
             
         if not df_colab_performance.empty:
-            # Adiciona o filtro de pesquisa
             col_search, _ = st.columns([2, 8])
             with col_search:
                 search_term = st.text_input("Pesquisar por nome:", "").upper()
@@ -886,7 +886,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
             if search_term:
                 df_filtrado_colab = df_filtrado_colab[df_filtrado_colab[config.coluna_colaborador].str.contains(search_term, na=False)]
 
-            # Ordena a tabela pela quantidade de serviços executados
             df_filtrado_colab = df_filtrado_colab.sort_values(by='Qtd_Executados', ascending=False)
             
             st.markdown("#### Tabela de Desempenho Individual Completa")
@@ -900,50 +899,91 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
 
             st.markdown("---")
             
-            st.markdown("#### Gráficos de Desempenho por Colaborador")
+            st.markdown("### Análise de Serviços (Apenas para seus Colaboradores)")
             
-            metricas_opcoes = {
-                'Qtd_Alocados': {'label': 'Quantidade de Serviços Alocados', 'color': '#1f77b4'},
-                'Qtd_Executados': {'label': 'Quantidade de Serviços Executados', 'color': '#1f77b4'},
-                'Qtd_Produtivos': {'label': 'Quantidade de Serviços Produtivos', 'color': '#1f77b4'},
-                'Qtd_Improdutivos': {'label': 'Quantidade de Serviços Improdutivos', 'color': '#1f77b4'},
-                'Qtd_Em_Campo': {'label': 'Quantidade de Serviços em Campo', 'color': '#1f77b4'},
-                'Qtd_Pendentes': {'label': 'Quantidade de Serviços Pendentes', 'color': '#1f77b4'},
-            }
-            
-            selecao_metrica = st.selectbox(
-                "Selecione a métrica para o gráfico:",
-                options=list(metricas_opcoes.keys()),
-                format_func=lambda x: metricas_opcoes[x]['label'],
-                key='metrica_colaborador_chart'
+            st.markdown("#### Serviços Executados")
+            selecao_visualizacao_executados_colab = st.radio(
+                "Visualização do Gráfico:",
+                ["Produtivos e Improdutivos", "Total de Executados"],
+                key="radio_visao_executados_colab",
+                horizontal=True
+            )
+            visao_dimensao_executados_colab = st.radio(
+                "Agrupar por:", 
+                ["Regional", "Município"], 
+                key="radio_dimensao_executados_colab", 
+                horizontal=True
             )
             
-            metrica_selecionada = metricas_opcoes[selecao_metrica]
+            coluna_agregacao_colab = 'REGIONAL' if visao_dimensao_executados_colab == "Regional" else 'MUNICIPIO'
             
-            if not df_filtrado_colab.empty:
-                total_metrica = df_filtrado_colab[selecao_metrica].sum()
-                total_formatado = formatar_inteiro(total_metrica)
-                titulo_grafico = f"{metrica_selecionada['label']} por Colaborador (Total: {total_formatado})"
+            if selecao_visualizacao_executados_colab == "Total de Executados":
+                df_agregado_colab = agregar_por_dimensao(df_para_analise, coluna_agregacao_colab, 'executados')
+                if not df_agregado_colab.empty:
+                    st.plotly_chart(plot_bar_chart(df_agregado_colab, 'Dimensão', 'Métrica', 'Total de Serviços Executados por ' + visao_dimensao_executados_colab, visao_dimensao_executados_colab, 'Quantidade', color_discrete_sequence=['#1f77b4']), use_container_width=True)
+                else:
+                    st.info("Nenhum dado de 'Total de Executados' disponível para a seleção de colaboradores.")
             else:
-                titulo_grafico = f"{metrica_selecionada['label']} por Colaborador"
+                df_produtivos_colab = agregar_por_dimensao(df_para_analise, coluna_agregacao_colab, 'produtivos')
+                df_improdutivos_colab = agregar_por_dimensao(df_para_analise, coluna_agregacao_colab, 'improdutivos')
+                
+                if not df_produtivos_colab.empty or not df_improdutivos_colab.empty:
+                    df_plot_prod_improd_colab = pd.concat([df_produtivos_colab.assign(Tipo='Produtivo'), df_improdutivos_colab.assign(Tipo='Improdutivo')])
+                    color_map = {'Produtivo': '#003366', 'Improdutivo': '#6699cc'} 
+                    
+                    fig_prod_improd_colab = px.bar(
+                        df_plot_prod_improd_colab, 
+                        x='Métrica', 
+                        y='Dimensão', 
+                        color='Tipo',
+                        title=f"<b>Serviços Produtivos e Improdutivos por {visao_dimensao_executados_colab}</b>",
+                        labels={'Dimensão': visao_dimensao_executados_colab, 'Métrica': 'Quantidade'},
+                        color_discrete_map=color_map,
+                        orientation='h',
+                        height=min(600, len(df_plot_prod_improd_colab['Dimensão'].unique()) * 30 + 150)
+                    )
+                    
+                    fig_prod_improd_colab.update_traces(
+                        text=df_plot_prod_improd_colab['Métrica'],
+                        texttemplate='%{x}',
+                        textposition='outside',
+                        hovertemplate="<b>%{y}</b><br>Quantidade: %{x}<extra></extra>",
+                        marker_line_width=1,
+                        marker_line_color='white'
+                    )
+                    
+                    fig_prod_improd_colab.update_layout(
+                        xaxis_title_font_size=14,
+                        yaxis_title_font_size=14,
+                        title_font_size=18,
+                        title_font_color='black',
+                        font_color='black',
+                        template='plotly_white',
+                        margin=dict(l=20, r=20, t=50, b=20),
+                        title_x=0.5,
+                        title_y=0.95,
+                        yaxis={'categoryorder': 'total ascending'}
+                    )
+                    st.plotly_chart(fig_prod_improd_colab, use_container_width=True)
+                else:
+                    st.info("Nenhum dado de 'Produtivos e Improdutivos' disponível para a seleção de colaboradores.")
             
-            fig_colab = plot_bar_chart(
-                df_data=df_filtrado_colab.sort_values(by=selecao_metrica, ascending=False), 
-                x_col=config.coluna_colaborador, 
-                y_col=selecao_metrica,
-                title=titulo_grafico,
-                x_label="Colaborador",
-                y_label="Quantidade de Serviços",
-                color_discrete_sequence=['#1f77b4'],
-                orientation='v' # Alterado para vertical
-            )
-            st.plotly_chart(fig_colab, use_container_width=True)
+            st.markdown("---")
+            
+            st.markdown("#### Serviços Pendentes")
+            visao_pendentes_colab = st.radio("Filtrar Pendentes por:", ["Regional", "Município"], key="radio_pendentes_colab", horizontal=True)
+            coluna_pendentes_colab = 'REGIONAL' if visao_pendentes_colab == "Regional" else 'MUNICIPIO'
+            
+            df_agregado_pendentes_colab = agregar_por_dimensao(df_para_analise, coluna_pendentes_colab, 'pendentes')
+            if not df_agregado_pendentes_colab.empty:
+                st.plotly_chart(plot_bar_chart(df_agregado_pendentes_colab, 'Dimensão', 'Métrica', 'Serviços Pendentes por ' + visao_pendentes_colab, visao_pendentes_colab, 'Quantidade', color_discrete_sequence=['#1565c0']), use_container_width=True)
+            else:
+                st.info("Nenhum dado de 'Serviços Pendentes' disponível para a seleção de colaboradores.")
             
             st.markdown("---")
             st.markdown("### Baixar Relatório")
             
             buffer_pdf = BytesIO()
-            # A chamada à função de gerar PDF também foi corrigida
             pdf_data = RelatorioVisualPDF(config.logo_path, config.palette, buffer_pdf).generate_report(df_base_total, df_para_analise, df_colab_performance, colaboradores_nao_encontrados, selecao_regional)
             
             if pdf_data:
