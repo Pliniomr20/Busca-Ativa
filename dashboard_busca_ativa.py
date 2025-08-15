@@ -702,7 +702,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
     
     metas_kpis = calcular_metas_por_regional(df_principal, config.metas_regionais, selecao_regional)
 
-    tab_base, tab_colaboradores = st.tabs(["📊 Análise da Base", "👥 Desempenho por Colaborador"])
+    tab_base, tab_colaboradores = st.tabs(["📊 Análise da Base Geral", "👥 Desempenho por Colaborador MF"])
 
     with tab_base:
         st.markdown("### Resultados Resumidos")
