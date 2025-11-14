@@ -228,8 +228,11 @@ def carregar_e_processar_dados(caminho_arquivo: Path) -> pd.DataFrame:
         df['MUNICIPIO'] = df['MUNICIPIO'].str.upper().str.strip()
         df[config.coluna_colaborador] = df[config.coluna_colaborador].str.upper().str.strip()
         
+        # 1. Converte para datetime (mantém-se o código original para garantia)
         df['DATA_DEVOLUCAO'] = pd.to_datetime(df['DATA_DEVOLUCAO'], errors='coerce', dayfirst=True)
-        df['DATA_DEVOLUCAO_FILTRO'] = df['DATA_DEVOLUCAO'].dt.strftime('%d/%m/%Y').fillna('00/00/0000')
+
+        # 2. Altera o formato para Mês/Ano ('%m/%Y') e ajusta o fillna
+        df['DATA_DEVOLUCAO_FILTRO'] = df['DATA_DEVOLUCAO'].dt.strftime('%m/%Y').fillna('00/0000')
 
         regionais_validas = ['NORTE', 'NORDESTE', 'SUL']
         df = df[df['REGIONAL'].isin(regionais_validas)].copy()
