@@ -6,7 +6,7 @@ pd.set_option('display.max_rows', None)
 
 # Caminho completo do arquivo Excel.
 # ATENÇÃO: Substitua 'BUSCA ATIVA.xlsx' pelo nome e caminho exato do seu arquivo.
-arquivo_excel = Path(r"C:\Users\USUARIO\Desktop\BUSCA ATIVA\BUSCA ATIVA.xlsx")
+arquivo_excel = Path(r"C:\Users\Plinio Mourato\Desktop\BUSCA ATIVA\BUSCA ATIVA.xlsx")
 
 if not arquivo_excel.exists():
     print(f"Erro: Arquivo '{arquivo_excel}' não encontrado.")
