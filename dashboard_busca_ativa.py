@@ -726,7 +726,6 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                     format="%.2f %%",
                     min_value=0,
                     max_value=100,
-                    color=primary_color 
                 ),
             }
 
