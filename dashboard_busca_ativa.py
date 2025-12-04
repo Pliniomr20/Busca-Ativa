@@ -305,13 +305,13 @@ class RelatorioVisualPDF:
         df_pdf = df.rename(columns={
             'Colaborador': 'Nome Agente', 
             'Qtd_Visitas_Total': 'Total Visitas',
-            'Qtd_Produtivos': 'Concluído OK',
+            'Qtd_Produtivos': 'Produtivos',
             '% Produtividade': 'Produtividade (%)' 
         }).sort_values(by='Concluído OK', ascending=False)
         
         df_pdf['Produtividade (%)'] = df_pdf['Produtividade (%)'].apply(lambda x: f"{x:,.2f}%".replace(",", "X").replace(".", ",").replace("X", "."))
         
-        headers = [Paragraph(col, self.styles['table_header']) for col in ['Nome Agente', 'Total Visitas', 'Concluído OK', 'Produtividade (%)']]
+        headers = [Paragraph(col, self.styles['table_header']) for col in ['Nome Agente', 'Total Visitas', 'Produtivos', 'Produtividade (%)']]
         data = [headers]
         
         for _, row in df_pdf.iterrows():
@@ -319,7 +319,7 @@ class RelatorioVisualPDF:
             row_data = [
                 Paragraph(str(row['Nome Agente']), self.styles['table_body']),
                 Paragraph(str(formatar_inteiro(row['Total Visitas'])), self.styles['table_body_center']),
-                Paragraph(str(formatar_inteiro(row['Concluído OK'])), self.styles['table_body_center']),
+                Paragraph(str(formatar_inteiro(row['Prodrutivos'])), self.styles['table_body_center']),
                 Paragraph(str(row['Produtividade (%)']), self.styles['table_body_prod'] if float(str(row['Produtividade (%)']).replace('%', '').replace(',', '.')) >= 50 else self.styles['table_body_center'])
             ]
             data.append(row_data)
@@ -637,19 +637,19 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                 
                 with col:
                     if not df_reg.empty:
-                        concluido = df_reg['Concluído OK'].iloc[0]
+                        concluido = df_reg['Prodrutivos'].iloc[0]
                         total_vis = df_reg['Total Visitas'].iloc[0]
                         prod_perc = df_reg['Produtividade (%)'].iloc[0]
                         
                         st.markdown(f"**{regional}**", unsafe_allow_html=True)
                         st.metric(
-                            f"Concluído OK ({regional})",
+                            f"Prodrutivos ({regional})",
                             concluido,
                             delta=f"Total Visitas: {total_vis} | Prod. Regional: {prod_perc}"
                         )
                     else:
                         st.markdown(f"**{regional}**", unsafe_allow_html=True)
-                        st.metric(f"Concluído OK ({regional})", "0", delta="Sem registros.", delta_color="off")
+                        st.metric(f"Prodrutivos ({regional})", "0", delta="Sem registros.", delta_color="off")
 
             st.markdown('</div>', unsafe_allow_html=True)
         
@@ -712,7 +712,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
             
             df_final = df_regional[['Posição', 'Colaborador', 'Qtd_Visitas_Total', 'Qtd_Produtivos', '% Produtividade']].rename(columns={
                 'Qtd_Visitas_Total': 'Total Visitas',
-                'Qtd_Produtivos': 'Concluído OK',
+                'Qtd_Produtivos': 'Prodrutivos',
                 '% Produtividade': 'Produtividade (%)'
             })
             
@@ -720,7 +720,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                 "Posição": st.column_config.NumberColumn("Pos.", width="small"),
                 "Colaborador": st.column_config.TextColumn("Colaborador", width="large"),
                 "Total Visitas": st.column_config.NumberColumn("Total Visitas", format="%d", help="Total de serviços executados em campo"),
-                "Concluído OK": st.column_config.NumberColumn("Concluído OK", format="%d", help="Total de visitas produtivas"),
+                "Prodrutivos": st.column_config.NumberColumn("Prodrutivos", format="%d", help="Total de visitas produtivas"),
                 "Produtividade (%)": st.column_config.ProgressColumn(
                     "Produtividade (%)",
                     format="%.2f %%",
