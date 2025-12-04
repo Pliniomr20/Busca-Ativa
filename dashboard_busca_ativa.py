@@ -52,7 +52,7 @@ class Config:
         
         self.servicos = {
             'executados': ['CONCLUIDO OK', 'DESCARREGADO COM IMPEDIMENTO', 'DESCARREGADO SEM IMPEDIMENTO', 'IMPROCEDENTE'],
-            'produtivos': ['CONCLUIDO OK', 'DESCARREGADO SEM IMPEDIMENTO'],
+            'produtivos': ['CONCLUIDO OK'],
         }
 
         # Lista de Colaboradores (Mantida inalterada)
@@ -305,13 +305,13 @@ class RelatorioVisualPDF:
         df_pdf = df.rename(columns={
             'Colaborador': 'Nome Agente', 
             'Qtd_Visitas_Total': 'Total Visitas',
-            'Qtd_Produtivos': 'Produtivos',
+            'Qtd_Produtivos': 'Concluído OK',
             '% Produtividade': 'Produtividade (%)' 
         }).sort_values(by='Concluído OK', ascending=False)
         
         df_pdf['Produtividade (%)'] = df_pdf['Produtividade (%)'].apply(lambda x: f"{x:,.2f}%".replace(",", "X").replace(".", ",").replace("X", "."))
         
-        headers = [Paragraph(col, self.styles['table_header']) for col in ['Nome Agente', 'Total Visitas', 'Produtivos', 'Produtividade (%)']]
+        headers = [Paragraph(col, self.styles['table_header']) for col in ['Nome Agente', 'Total Visitas', 'Concluído OK', 'Produtividade (%)']]
         data = [headers]
         
         for _, row in df_pdf.iterrows():
@@ -319,7 +319,7 @@ class RelatorioVisualPDF:
             row_data = [
                 Paragraph(str(row['Nome Agente']), self.styles['table_body']),
                 Paragraph(str(formatar_inteiro(row['Total Visitas'])), self.styles['table_body_center']),
-                Paragraph(str(formatar_inteiro(row['Prodrutivos'])), self.styles['table_body_center']),
+                Paragraph(str(formatar_inteiro(row['Concluído OK'])), self.styles['table_body_center']),
                 Paragraph(str(row['Produtividade (%)']), self.styles['table_body_prod'] if float(str(row['Produtividade (%)']).replace('%', '').replace(',', '.')) >= 50 else self.styles['table_body_center'])
             ]
             data.append(row_data)
@@ -637,19 +637,19 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                 
                 with col:
                     if not df_reg.empty:
-                        concluido = df_reg['Prodrutivos'].iloc[0]
+                        concluido = df_reg['Concluído OK'].iloc[0]
                         total_vis = df_reg['Total Visitas'].iloc[0]
                         prod_perc = df_reg['Produtividade (%)'].iloc[0]
                         
                         st.markdown(f"**{regional}**", unsafe_allow_html=True)
                         st.metric(
-                            f"Prodrutivos ({regional})",
+                            f"Concluído OK ({regional})",
                             concluido,
                             delta=f"Total Visitas: {total_vis} | Prod. Regional: {prod_perc}"
                         )
                     else:
                         st.markdown(f"**{regional}**", unsafe_allow_html=True)
-                        st.metric(f"Prodrutivos ({regional})", "0", delta="Sem registros.", delta_color="off")
+                        st.metric(f"Concluído OK ({regional})", "0", delta="Sem registros.", delta_color="off")
 
             st.markdown('</div>', unsafe_allow_html=True)
         
@@ -666,7 +666,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
         
         with col_kpi_content:
             # O Sumário Produtivo Geral agora ocupa a largura da coluna central.
-            st.markdown("") 
+            st.markdown("#### Sumário Produtivo Geral") 
             total_produtivo_geral = df_desempenho['Qtd_Produtivos'].sum()
             df_prod_resumo = df_desempenho.groupby('Regional')['Qtd_Produtivos'].sum().reset_index(name='Total_Produtivo')
             df_prod_resumo['Regional'] = pd.Categorical(df_prod_resumo['Regional'], categories=['SUL', 'NORTE', 'NORDESTE'], ordered=True)
@@ -688,7 +688,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
     st.markdown("---")
 
     # 4. Tabelas separadas por regional (AGORA EMPILHADAS)
-    st.markdown("## 🎯 Desempenho Individual por Colaborador")
+    st.markdown("## 🎯 Desempenho Individual de Visitas por Colaborador")
     
     regionais_selecionadas = sorted([r for r in ['SUL', 'NORTE', 'NORDESTE'] if r in selecao_regional])
     
@@ -699,7 +699,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
             df_regional = df_desempenho[df_desempenho['Regional'] == regional].copy()
             
             if df_regional.empty:
-                st.markdown(f"📍{regional}")
+                st.markdown(f"### 📍 Regional {regional}")
                 st.info(f"Nenhum colaborador com dados de visitas na Regional {regional}.")
                 continue
 
@@ -712,7 +712,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
             
             df_final = df_regional[['Posição', 'Colaborador', 'Qtd_Visitas_Total', 'Qtd_Produtivos', '% Produtividade']].rename(columns={
                 'Qtd_Visitas_Total': 'Total Visitas',
-                'Qtd_Produtivos': 'Prodrutivos',
+                'Qtd_Produtivos': 'Concluído OK',
                 '% Produtividade': 'Produtividade (%)'
             })
             
@@ -720,7 +720,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                 "Posição": st.column_config.NumberColumn("Pos.", width="small"),
                 "Colaborador": st.column_config.TextColumn("Colaborador", width="large"),
                 "Total Visitas": st.column_config.NumberColumn("Total Visitas", format="%d", help="Total de serviços executados em campo"),
-                "Prodrutivos": st.column_config.NumberColumn("Prodrutivos", format="%d", help="Total de visitas produtivas"),
+                "Concluído OK": st.column_config.NumberColumn("Concluído OK", format="%d", help="Total de visitas produtivas"),
                 "Produtividade (%)": st.column_config.ProgressColumn(
                     "Produtividade (%)",
                     format="%.2f %%",
@@ -729,7 +729,7 @@ if not df_principal.empty and selecao_regional and selecao_municipio and selecao
                 ),
             }
 
-            st.markdown(f"📍{regional}")
+            st.markdown(f"### 📍 Regional {regional}")
             
             st.data_editor(
                 df_final,
