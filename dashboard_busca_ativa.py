@@ -52,7 +52,7 @@ class Config:
         
         self.servicos = {
             'executados': ['CONCLUIDO OK', 'DESCARREGADO COM IMPEDIMENTO', 'DESCARREGADO SEM IMPEDIMENTO', 'IMPROCEDENTE'],
-            'produtivos': ['CONCLUIDO OK'],
+            'produtivos': ['CONCLUIDO OK', 'DESCARREGADO SEM IMPEDIMENTO'],
         }
 
         # Lista de Colaboradores (Mantida inalterada)
