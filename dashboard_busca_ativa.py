@@ -504,7 +504,23 @@ if not df_principal.empty and selecao_regional and selecao_municipio:
     
     with c_chart:
         fig = plot_bar_chart_produtividade_regional(df_desempenho)
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        
+        # --- CONFIGURAÇÃO DE INTERATIVIDADE PLOTLY (ZOOM, PAN, DOWNLOAD) ---
+        st.plotly_chart(
+            fig, 
+            use_container_width=True, 
+            config={
+                'displayModeBar': 'hover', # A barra aparece apenas ao passar o mouse
+                'scrollZoom': True,        # Permite zoom com scroll do mouse
+                'displaylogo': False,      # Remove logo do Plotly para manter visual limpo
+                'modeBarButtonsToRemove': ['lasso2d', 'select2d'], # Remove seleção de caixa (desnecessário)
+                'toImageButtonOptions': {
+                    'format': 'png', 
+                    'filename': 'grafico_produtividade_overview',
+                    'scale': 2 # Download em alta resolução
+                }
+            }
+        )
     
     with c_kpis:
         st.markdown("### Resumo por Regional")
